@@ -32,7 +32,7 @@ func (c *Client) httpClient() *http.Client {
 	return c.HttpClient
 }
 
-func (c *Client) verify() error {
+func (c *Client) Validate() error {
 	if c.PublicKey == "" {
 		return InvalidClientFieldError("PublicKey")
 	}
@@ -48,7 +48,7 @@ func (c *Client) verify() error {
 
 // Get calls UCloud API. It will generate signature and append it automatically.
 func (c *Client) Get(params url.Values) (resp *http.Response, err error) {
-	err = c.verify()
+	err = c.Validate()
 	if err != nil {
 		return
 	}
