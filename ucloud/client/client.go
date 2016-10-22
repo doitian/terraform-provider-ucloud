@@ -1,6 +1,8 @@
 package client
 
 import (
+	"encoding/json"
+	"io/ioutil"
 	"net/http"
 	"net/url"
 )
@@ -62,4 +64,19 @@ func (c *Client) Get(params url.Values) (resp *http.Response, err error) {
 	targetUrl := c.endpoint() + "?" + params.Encode() + "&Signature=" + GenerateSignature(params, c.PrivateKey)
 
 	return c.httpClient().Get(targetUrl)
+}
+
+func (c *Client) GetJSON(params url.Values, v interface{}) error {
+	resp, err := c.Get(params)
+	if err != nil {
+		return err
+	}
+
+	defer resp.Body.Close()
+	bytes, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return err
+	}
+
+	return json.Unmarshal(bytes, v)
 }

@@ -2,10 +2,10 @@ package client
 
 import (
 	"io"
-	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -56,7 +56,7 @@ func TestSampleSignature(t *testing.T) {
 		if query.Get("Signature") != "4f9ef5df2abab2c6fccd1e9515cb7e2df8c6bb65" {
 			t.Error("Invalid Signature!")
 		}
-		io.WriteString(rw, `OK`)
+		io.WriteString(rw, `{"RetCode":1}`)
 	}
 	params := url.Values{}
 
@@ -72,20 +72,14 @@ func TestSampleSignature(t *testing.T) {
 	params.Set("ChargeType", "Month")
 	params.Set("Quantity", "1")
 
-	resp, err := c.Get(params)
+	var resp struct {
+		RetCode int
+	}
+	err := c.GetJSON(params, &resp)
 	if err != nil {
 		t.Fatal("Got error sending item")
 	}
-	if resp == nil {
-		t.Fatal("Expect valid resp but got nil")
-	}
-	defer resp.Body.Close()
-	bodyBytes, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		t.Fatal("Go error reading body")
-	}
-	body := string(bodyBytes)
-	if body != "OK" {
-		t.Fatal("Expect body to be OK but got: " + body)
+	if resp.RetCode != 1 {
+		t.Fatal("Expect RetCode to be 1 but got: " + strconv.Itoa(resp.RetCode))
 	}
 }

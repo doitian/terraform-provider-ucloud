@@ -38,6 +38,12 @@ func Provider() terraform.ResourceProvider {
 				DefaultFunc: schema.EnvDefaultFunc("UCLOUD_REGION", nil),
 				Description: "UCloud IDC region, see https://docs.ucloud.cn/api/summary/regionlist",
 			},
+			"endpoint": &schema.Schema{
+				Type:        schema.TypeString,
+				Optional:    true,
+				DefaultFunc: schema.EnvDefaultFunc("UCLOUD_ENDPOINT", nil),
+				Description: "UCloud API Endpoint",
+			},
 		},
 
 		ResourcesMap: map[string]*schema.Resource{
@@ -55,6 +61,7 @@ func providerConfigure(d *schema.ResourceData) (interface{}, error) {
 		PrivateKey: d.Get("private_key").(string),
 		ProjectId:  d.Get("project_id").(string),
 		Region:     d.Get("region").(string),
+		Endpoint:   d.Get("endpoint").(string),
 	}
 
 	err := apiClient.Validate()
