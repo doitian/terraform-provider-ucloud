@@ -46,6 +46,10 @@ func Provider() terraform.ResourceProvider {
 			},
 		},
 
+		DataSourcesMap: map[string]*schema.Resource{
+			"ucloud_image": dataSourceImage(),
+		},
+
 		ResourcesMap: map[string]*schema.Resource{
 			"ucloud_uhost": resourceUHost(),
 		},

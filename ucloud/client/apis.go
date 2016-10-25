@@ -272,7 +272,7 @@ type UHostImage struct {
 	Zone             string
 	ImageName        string
 	ImageType        string
-	ImageSize        string
+	ImageSize        int
 	OsType           string
 	OsName           string
 	State            string
@@ -292,5 +292,5 @@ type DescribeImageRequest struct {
 type DescribeImageResponse struct {
 	GeneralResponse
 	TotalCount int
-	ImageSet   []UHostImage
+	ImageSet   []*UHostImage
 }
