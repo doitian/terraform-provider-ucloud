@@ -55,7 +55,7 @@ func Provider() terraform.ResourceProvider {
 }
 
 func providerConfigure(d *schema.ResourceData) (interface{}, error) {
-	apiClient := &client.Client{
+	config := client.Config{
 		HttpClient: &http.Client{},
 		PublicKey:  d.Get("public_key").(string),
 		PrivateKey: d.Get("private_key").(string),
@@ -64,11 +64,5 @@ func providerConfigure(d *schema.ResourceData) (interface{}, error) {
 		Endpoint:   d.Get("endpoint").(string),
 	}
 
-	err := apiClient.Validate()
-
-	if err != nil {
-		return nil, err
-	}
-
-	return apiClient, nil
+	return config.Client()
 }

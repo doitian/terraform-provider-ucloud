@@ -4,8 +4,6 @@ import (
 	"encoding/base64"
 	"fmt"
 	"log"
-	"net/url"
-	"strconv"
 	"time"
 
 	"github.com/hashicorp/terraform/helper/resource"
@@ -195,124 +193,65 @@ func resourceUHost() *schema.Resource {
 	}
 }
 
-type uhostIP struct {
-	Type      string
-	IPId      string
-	IP        string
-	bandwidth int
-}
-
-type uhostDisk struct {
-	Type   string
-	DiskId string
-	Name   int
-	Drive  int
-	Size   int
-}
-
-type uhostInstance struct {
-	UHostId        string
-	UHostType      string
-	Zone           string
-	StorageType    string
-	ImageId        string
-	BasicImageId   string
-	BasicImageName string
-	Tag            string
-	Remark         string
-	Name           string
-	State          string
-	CreateTime     int
-	ChargeType     string
-	ExpireTime     int
-	CPU            int
-	Memory         int
-	AutoRenew      string
-	DiskSet        []uhostDisk
-	IPSet          []uhostIP
-	NetCapability  string
-	NetworkState   string
-}
-
-type generalResponse struct {
-	Action  string
-	RetCode int
-}
-
-type describeUHostResponse struct {
-	generalResponse
-	TotalCount int
-	UHostSet   []uhostInstance
-}
-
-type createUHostResponse struct {
-	generalResponse
-	UHostIds []string
-}
-
 func resourceUHostCreate(d *schema.ResourceData, meta interface{}) error {
 	apiClient := meta.(*client.Client)
 
-	params := url.Values{}
-	params.Set("Action", "CreateUHostInstance")
-	params.Set("Zone", d.Get("zone").(string))
-	params.Set("ImageId", d.Get("image_id").(string))
-	params.Set("LoginMode", "Password")
-	params.Set("Password", base64.StdEncoding.EncodeToString([]byte(d.Get("password").(string))))
+	params := client.CreateUHostInstanceRequest{
+		Zone:      d.Get("zone").(string),
+		ImageId:   d.Get("image_id").(string),
+		LoginMode: "Password",
+		Password:  base64.StdEncoding.EncodeToString([]byte(d.Get("password").(string))),
+	}
 
 	if v, ok := d.GetOk("cpu"); ok {
-		params.Set("CPU", strconv.Itoa(v.(int)))
+		params.CPU = v.(int)
 	}
 	if v, ok := d.GetOk("memory"); ok {
-		params.Set("Memory", strconv.Itoa(v.(int)))
+		params.Memory = v.(int)
 	}
 	if v, ok := d.GetOk("storage_type"); ok {
-		params.Set("StorageType", v.(string))
+		params.StorageType = v.(string)
 	}
 	if v, ok := d.GetOk("disk_space"); ok {
-		params.Set("DiskSpace", strconv.Itoa(v.(int)))
+		params.DiskSpace = v.(int)
 	}
 	if v, ok := d.GetOk("name"); ok {
-		params.Set("Name", v.(string))
+		params.Name = v.(string)
 	}
 	if v, ok := d.GetOk("network_id"); ok {
-		params.Set("NetworkId", v.(string))
+		params.NetworkId = v.(string)
 	}
 	if v, ok := d.GetOk("security_group_id"); ok {
-		params.Set("SecurityGroupId", v.(string))
+		params.SecurityGroupId = v.(string)
 	}
 	if v, ok := d.GetOk("charge_type"); ok {
-		params.Set("ChargeType", v.(string))
+		params.ChargeType = v.(string)
 	}
 	if v, ok := d.GetOk("quantity"); ok {
-		params.Set("Quantity", strconv.Itoa(v.(int)))
+		params.Quantity = v.(int)
 	}
 	if v, ok := d.GetOk("uhost_type"); ok {
-		params.Set("UHostType", v.(string))
+		params.UHostType = v.(string)
 	}
 	if v, ok := d.GetOk("net_capability"); ok {
-		params.Set("NetCapability", v.(string))
+		params.NetCapability = v.(string)
 	}
 	if v, ok := d.GetOk("tag"); ok {
-		params.Set("Tag", v.(string))
+		params.Tag = v.(string)
 	}
 	if v, ok := d.GetOk("boot_disk_space"); ok {
-		params.Set("BootDiskSpace", strconv.Itoa(v.(int)))
+		params.BootDiskSpace = v.(int)
 	}
 
 	log.Printf("[DEBUG] Run configuration: %s", params)
 
-	var respBody createUHostResponse
-	err := apiClient.GetJSON(params, &respBody)
+	var resp client.CreateUHostInstanceResponse
+	err := apiClient.Call(&params, &resp)
 	if err != nil {
 		return err
 	}
 
-	if respBody.RetCode != 0 {
-		return client.BadRetCodeError{"CreateUHostInstance", respBody.RetCode}
-	}
-
-	id := respBody.UHostIds[0]
+	id := resp.UHostIds[0]
 	d.SetId(id)
 
 	log.Printf("[DEBUG] Waiting for instance (%s) to become running", id)
@@ -331,7 +270,7 @@ func resourceUHostCreate(d *schema.ResourceData, meta interface{}) error {
 		return fmt.Errorf("Error waiting for instance (%s) to become ready: %s", id, err)
 	}
 
-	ip := findInstanceIP(instance.(*uhostInstance))
+	ip := findInstanceIP(instance.(*client.UHostInstance))
 	if ip != "" {
 		d.SetConnInfo(map[string]string{
 			"type":     "ssh",
@@ -369,52 +308,56 @@ func resourceUHostUpdate(d *schema.ResourceData, meta interface{}) error {
 	apiClient := meta.(*client.Client)
 
 	d.Partial(true)
-	var resp generalResponse
+	var resp client.GeneralResponse
 
-	// tag
-	if tag := d.Get("tag"); d.HasChange("tag") || (d.IsNewResource() && tag.(string) != "") {
-		params := url.Values{}
-		params.Set("Action", "ModifyUHostInstanceTag")
-		params.Set("UHostId", d.Id())
-		params.Set("Tag", tag.(string))
-		err := apiClient.GetJSON(params, &resp)
+	// name
+	if name := d.Get("name"); d.HasChange("name") || (d.IsNewResource() && name.(string) != "") {
+		params := &client.ModifyUHostInstanceNameRequest{
+			UHostId: d.Id(),
+			Name:    name.(string),
+		}
+		err := apiClient.Call(params, &resp)
 		if err != nil {
 			return err
 		}
-		if resp.RetCode != 0 {
-			return client.BadRetCodeError{"ModifyUHostInstanceTag", resp.RetCode}
+		d.SetPartial("name")
+	}
+
+	// tag
+	if tag := d.Get("tag"); d.HasChange("tag") || (d.IsNewResource() && tag.(string) != "") {
+		params := &client.ModifyUHostInstanceTagRequest{
+			UHostId: d.Id(),
+			Tag:     tag.(string),
+		}
+		err := apiClient.Call(params, &resp)
+		if err != nil {
+			return err
 		}
 		d.SetPartial("tag")
 	}
 
 	// remark
 	if remark := d.Get("remark"); d.HasChange("remark") || (d.IsNewResource() && remark.(string) != "") {
-		params := url.Values{}
-		params.Set("Action", "ModifyUHostInstanceRemark")
-		params.Set("UHostId", d.Id())
-		params.Set("Remark", remark.(string))
-		err := apiClient.GetJSON(params, &resp)
+		params := client.ModifyUHostInstanceRemarkRequest{
+			UHostId: d.Id(),
+			Remark:  remark.(string),
+		}
+		err := apiClient.Call(&params, &resp)
 		if err != nil {
 			return err
-		}
-		if resp.RetCode != 0 {
-			return client.BadRetCodeError{"ModifyUHostInstanceRemark", resp.RetCode}
 		}
 		d.SetPartial("remark")
 	}
 
 	// password
 	if d.HasChange("password") {
-		params := url.Values{}
-		params.Set("Action", "ResetUHostInstancePassword")
-		params.Set("UHostId", d.Id())
-		params.Set("Password", base64.StdEncoding.EncodeToString([]byte(d.Get("password").(string))))
-		err := apiClient.GetJSON(params, &resp)
+		params := client.ResetUHostInstancePasswordRequest{
+			UHostId:  d.Id(),
+			Password: base64.StdEncoding.EncodeToString([]byte(d.Get("password").(string))),
+		}
+		err := apiClient.Call(&params, &resp)
 		if err != nil {
 			return err
-		}
-		if resp.RetCode != 0 {
-			return client.BadRetCodeError{"ModifyUHostInstanceRemark", resp.RetCode}
 		}
 		d.SetPartial("password")
 	}
@@ -422,15 +365,9 @@ func resourceUHostUpdate(d *schema.ResourceData, meta interface{}) error {
 	// reize: has to restart the host
 	// 实例状态， 初始化: Initializing; 启动中: Starting; 运行中: Running; 关机中: Stopping; 关机: Stopped 安装失败: Install Fail; 重启中: Rebooting
 	if d.HasChange("cpu") || d.HasChange("memory") || d.HasChange("disk_space") {
-		stopUHostInstanceParmas := url.Values{}
-		stopUHostInstanceParmas.Set("Action", "StopUHostInstance")
-		stopUHostInstanceParmas.Set("UHostId", d.Id())
-		err := apiClient.GetJSON(stopUHostInstanceParmas, &resp)
+		err := apiClient.Call(&client.StopUHostInstanceRequest{UHostId: d.Id()}, &resp)
 		if err != nil {
 			return err
-		}
-		if resp.RetCode != 0 {
-			return client.BadRetCodeError{"StopUHostInstance", resp.RetCode}
 		}
 
 		stateConf := &resource.StateChangeConf{
@@ -446,29 +383,26 @@ func resourceUHostUpdate(d *schema.ResourceData, meta interface{}) error {
 			return err
 		}
 
-		resizeUHostInstanceParams := url.Values{}
-		resizeUHostInstanceParams.Set("Action", "ResizeUHostInstance")
-		resizeUHostInstanceParams.Set("UHostId", d.Id())
-		resizeUHostInstanceParams.Set("CPU", strconv.Itoa(d.Get("cpu").(int)))
-		resizeUHostInstanceParams.Set("Memory", strconv.Itoa(d.Get("memory").(int)))
-		resizeUHostInstanceParams.Set("DiskSpace", strconv.Itoa(d.Get("disk_space").(int)))
-		err = apiClient.GetJSON(resizeUHostInstanceParams, &resp)
+		params := client.ResizeUHostInstanceRequest{
+			UHostId: d.Id(),
+		}
+		if d.HasChange("cpu") {
+			params.CPU = d.Get("cpu").(int)
+		}
+		if d.HasChange("memory") {
+			params.Memory = d.Get("memory").(int)
+		}
+		if d.HasChange("disk_space") {
+			params.DiskSpace = d.Get("disk_space").(int)
+		}
+		err = apiClient.Call(&params, &resp)
 		if err != nil {
 			return err
-		}
-		if resp.RetCode != 0 {
-			return client.BadRetCodeError{"ResizeUHostInstance", resp.RetCode}
 		}
 
-		startUHostInstanceParmas := url.Values{}
-		startUHostInstanceParmas.Set("Action", "StartUHostInstance")
-		startUHostInstanceParmas.Set("UHostId", d.Id())
-		err = apiClient.GetJSON(startUHostInstanceParmas, &resp)
+		err = apiClient.Call(&client.StartUHostInstanceRequest{UHostId: d.Id()}, &resp)
 		if err != nil {
 			return err
-		}
-		if resp.RetCode != 0 {
-			return client.BadRetCodeError{"StartUHostInstance", resp.RetCode}
 		}
 
 		stateConf = &resource.StateChangeConf{
@@ -494,17 +428,14 @@ func resourceUHostUpdate(d *schema.ResourceData, meta interface{}) error {
 
 func resourceUHostDelete(d *schema.ResourceData, meta interface{}) error {
 	apiClient := meta.(*client.Client)
-	var resp generalResponse
 
-	terminateUHostInstanceParmas := url.Values{}
-	terminateUHostInstanceParmas.Set("Action", "TerminateUHostInstance")
-	terminateUHostInstanceParmas.Set("UHostId", d.Id())
-	err := apiClient.GetJSON(terminateUHostInstanceParmas, &resp)
+	var resp client.GeneralResponse
+	params := client.TerminateUHostInstanceRequest{
+		UHostId: d.Id(),
+	}
+	err := apiClient.Call(&params, &resp)
 	if err != nil {
 		return err
-	}
-	if resp.RetCode != 0 {
-		return client.BadRetCodeError{"TerminateUHostInstance", resp.RetCode}
 	}
 
 	d.SetId("")
@@ -512,22 +443,19 @@ func resourceUHostDelete(d *schema.ResourceData, meta interface{}) error {
 	return nil
 }
 
-func describeInstance(apiClient *client.Client, uhostID string) (*uhostInstance, error) {
-	params := url.Values{}
-	params.Set("Action", "DescribeUHostInstance")
-	params.Set("UHostIds.0", uhostID)
+func describeInstance(apiClient *client.Client, uhostID string) (*client.UHostInstance, error) {
+	params := client.DescribeUHostInstanceRequest{
+		UHostIds: []string{uhostID},
+	}
 
-	var respBody describeUHostResponse
-	err := apiClient.GetJSON(params, &respBody)
+	var resp client.DescribeUHostInstanceResponse
+	err := apiClient.Call(&params, &resp)
 	if err != nil {
 		return nil, err
 	}
-	if respBody.RetCode != 0 {
-		return nil, client.BadRetCodeError{"DescribeUHostInstance", respBody.RetCode}
-	}
 
-	if len(respBody.UHostSet) > 0 {
-		return &respBody.UHostSet[0], nil
+	if len(resp.UHostSet) > 0 {
+		return &resp.UHostSet[0], nil
 	}
 
 	return nil, nil
@@ -556,7 +484,7 @@ var ipTypePriority = [...]string{
 	"Private",
 }
 
-func findInstanceIP(instance *uhostInstance) string {
+func findInstanceIP(instance *client.UHostInstance) string {
 	if len(instance.IPSet) > 0 {
 		typeToIP := make(map[string]string, len(instance.IPSet))
 
@@ -576,7 +504,7 @@ func findInstanceIP(instance *uhostInstance) string {
 	return ""
 }
 
-func setResourceDataFromInstance(d *schema.ResourceData, instance *uhostInstance) {
+func setResourceDataFromInstance(d *schema.ResourceData, instance *client.UHostInstance) {
 	d.Set("uhost_type", instance.UHostType)
 	d.Set("storage_type", instance.StorageType)
 	d.Set("basic_image_id", instance.BasicImageId)

@@ -5,7 +5,6 @@ package client
 import (
 	"io/ioutil"
 	"net/http"
-	"net/url"
 	"os"
 	"testing"
 )
@@ -26,17 +25,23 @@ func TestDescribeUhost(t *testing.T) {
 		t.Fatal("UCLOUD_REGION is not set")
 	}
 
-	c := &Client{
+	c, err := Config{
 		HttpClient: &http.Client{},
 		PublicKey:  publicKey,
 		PrivateKey: privateKey,
 		ProjectId:  projectId,
 		Region:     region,
+	}.Client()
+	if err != nil {
+		t.Fatal("Failed to create client: ", err)
 	}
 
-	params := url.Values{}
-	params.Set("Action", "DescribeUHostInstance")
-	params.Set("Limit", "3")
+	params, err := BuildParams(&DescribeUHostInstanceRequest{
+		Limit: 3,
+	})
+	if err != nil {
+		t.Fatal("Failed to build params: ", err)
+	}
 	resp, err := c.Get(params)
 
 	if err != nil {

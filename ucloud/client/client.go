@@ -9,7 +9,7 @@ import (
 
 const DefaultEndpoint = "https://api.ucloud.cn"
 
-type Client struct {
+type Config struct {
 	HttpClient *http.Client
 	Endpoint   string
 	PublicKey  string
@@ -18,55 +18,69 @@ type Client struct {
 	Region     string
 }
 
-func (c *Client) endpoint() string {
-	if c.Endpoint == "" {
-		return DefaultEndpoint
-	}
-
-	return c.Endpoint
+type Client struct {
+	httpClient *http.Client
+	endpoint   string
+	publicKey  string
+	privateKey string
+	projectId  string
+	region     string
 }
 
-func (c *Client) httpClient() *http.Client {
-	if c.HttpClient == nil {
-		return http.DefaultClient
-	}
-
-	return c.HttpClient
+type Response interface {
+	ValidateResponse() error
 }
 
-func (c *Client) Validate() error {
+func (c Config) Client() (*Client, error) {
 	if c.PublicKey == "" {
-		return InvalidClientFieldError("PublicKey")
+		return nil, InvalidClientFieldError("PublicKey")
 	}
 	if c.PrivateKey == "" {
-		return InvalidClientFieldError("PrivateKey")
+		return nil, InvalidClientFieldError("PrivateKey")
 	}
 	if c.Region == "" {
-		return InvalidClientFieldError("Region")
+		return nil, InvalidClientFieldError("Region")
 	}
 
-	return nil
+	instance := &Client{
+		httpClient: c.HttpClient,
+		endpoint:   c.Endpoint,
+		publicKey:  c.PublicKey,
+		privateKey: c.PrivateKey,
+		projectId:  c.ProjectId,
+		region:     c.Region,
+	}
+
+	if instance.endpoint == "" {
+		instance.endpoint = DefaultEndpoint
+	}
+
+	if instance.httpClient == nil {
+		instance.httpClient = http.DefaultClient
+	}
+
+	return instance, nil
 }
 
 // Get calls UCloud API. It will generate signature and append it automatically.
 func (c *Client) Get(params url.Values) (resp *http.Response, err error) {
-	err = c.Validate()
-	if err != nil {
-		return
+	params.Set("PublicKey", c.publicKey)
+	params.Set("Region", c.region)
+	if c.projectId != "" {
+		params.Set("ProjectId", c.projectId)
 	}
 
-	params.Set("PublicKey", c.PublicKey)
-	params.Set("Region", c.Region)
-	if c.ProjectId != "" {
-		params.Set("ProjectId", c.ProjectId)
-	}
+	targetUrl := c.endpoint + "?" + params.Encode() + "&Signature=" + GenerateSignature(params, c.privateKey)
 
-	targetUrl := c.endpoint() + "?" + params.Encode() + "&Signature=" + GenerateSignature(params, c.PrivateKey)
-
-	return c.httpClient().Get(targetUrl)
+	return c.httpClient.Get(targetUrl)
 }
 
-func (c *Client) GetJSON(params url.Values, v interface{}) error {
+func (c *Client) Call(req interface{}, v Response) error {
+	params, err := BuildParams(req)
+	if err != nil {
+		return err
+	}
+
 	resp, err := c.Get(params)
 	if err != nil {
 		return err
@@ -78,5 +92,9 @@ func (c *Client) GetJSON(params url.Values, v interface{}) error {
 		return err
 	}
 
-	return json.Unmarshal(bytes, v)
+	err = json.Unmarshal(bytes, v)
+	if err != nil {
+		return err
+	}
+	return v.ValidateResponse()
 }

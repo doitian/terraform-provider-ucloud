@@ -13,8 +13,9 @@ func (icfe InvalidClientFieldError) Error() string {
 type BadRetCodeError struct {
 	Action  string
 	RetCode int
+	Message string
 }
 
-func (brce BadRetCodeError) Error() string {
-	return fmt.Sprintf("Bad RetCode %d in %s", brce.RetCode, brce.Action)
+func (brce *BadRetCodeError) Error() string {
+	return fmt.Sprintf("Bad RetCode %d in %s: %s", brce.RetCode, brce.Action, brce.Message)
 }
