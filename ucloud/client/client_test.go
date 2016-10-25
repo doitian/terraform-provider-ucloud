@@ -2,10 +2,14 @@ package client
 
 import (
 	"io"
+	"log"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"testing"
+
+	"github.com/hashicorp/terraform/helper/resource"
 )
 
 // Test InvalidClientFieldError
@@ -78,4 +82,48 @@ func TestSampleSignature(t *testing.T) {
 	if err != nil {
 		t.Fatal("Got error sending item: ", err)
 	}
+}
+
+func TestDescribeUhost(t *testing.T) {
+	if os.Getenv(resource.TestEnvVar) == "" {
+		return
+	}
+
+	publicKey := os.Getenv("UCLOUD_PUBLIC_KEY")
+	privateKey := os.Getenv("UCLOUD_PRIVATE_KEY")
+	region := os.Getenv("UCLOUD_REGION")
+	projectId := os.Getenv("UCLOUD_PROJECT_ID")
+
+	if publicKey == "" {
+		t.Fatal("UCLOUD_PUBLIC_KEY is not set")
+	}
+	if privateKey == "" {
+		t.Fatal("UCLOUD_PRIVATE_KEY is not set")
+	}
+	if region == "" {
+		t.Fatal("UCLOUD_REGION is not set")
+	}
+
+	c, err := Config{
+		HttpClient: &http.Client{},
+		PublicKey:  publicKey,
+		PrivateKey: privateKey,
+		ProjectId:  projectId,
+		Region:     region,
+	}.Client()
+	if err != nil {
+		t.Fatal("Failed to create client: ", err)
+	}
+
+	params := DescribeUHostInstanceRequest{
+		Limit: 3,
+	}
+	var resp DescribeUHostInstanceResponse
+	err = c.Call(&params, &resp)
+
+	if err != nil {
+		t.Fatal("Failed to call API: ", err)
+	}
+
+	log.Printf("[DEBUG] Got response: ", resp)
 }

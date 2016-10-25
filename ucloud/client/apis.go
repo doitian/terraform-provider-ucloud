@@ -119,14 +119,13 @@ type UHostIP struct {
 	Type      string
 	IPId      string
 	IP        string
-	bandwidth int
+	Bandwidth int
 }
 
 type UHostDisk struct {
 	Type   string
 	DiskId string
-	Name   int
-	Drive  int
+	Drive  string
 	Size   int
 }
 
