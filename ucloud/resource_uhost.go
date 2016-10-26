@@ -6,10 +6,10 @@ import (
 	"log"
 	"time"
 
+	"github.com/3pjgames/terraform-provider-ucloud/ucloud/client"
+
 	"github.com/hashicorp/terraform/helper/resource"
 	"github.com/hashicorp/terraform/helper/schema"
-
-	"github.com/3pjgames/terraform-provider-ucloud/ucloud/client"
 )
 
 func resourceUHost() *schema.Resource {
@@ -78,9 +78,10 @@ func resourceUHost() *schema.Resource {
 			},
 
 			"charge_type": {
-				Type:     schema.TypeString,
-				Optional: true,
-				Computed: true,
+				Type:        schema.TypeString,
+				Optional:    true,
+				Computed:    true,
+				Description: "计费模式，枚举值为： Year，按年付费； Month，按月付费； Dynamic，按需付费（需开启权限）； Trial，试用（需开启权限） 默认为月付",
 			},
 
 			"quantity": {
