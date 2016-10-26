@@ -125,5 +125,5 @@ func TestAccDescribeUHostInstance(t *testing.T) {
 		t.Fatal("Failed to call API: ", err)
 	}
 
-	log.Printf("[DEBUG] Got response: ", resp)
+	log.Printf("[DEBUG] Got response: %+v", resp)
 }
