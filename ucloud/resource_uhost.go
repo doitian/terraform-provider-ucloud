@@ -39,6 +39,7 @@ func resourceUHost() *schema.Resource {
 				Type:      schema.TypeString,
 				Required:  true,
 				Sensitive: true,
+				ForceNew:  true,
 			},
 
 			"cpu": {
@@ -312,10 +313,10 @@ func resourceUHostUpdate(d *schema.ResourceData, meta interface{}) error {
 	var resp client.GeneralResponse
 
 	// name
-	if name := d.Get("name"); d.HasChange("name") || (d.IsNewResource() && name.(string) != "") {
+	if d.HasChange("name") && !d.IsNewResource() {
 		params := &client.ModifyUHostInstanceNameRequest{
 			UHostId: d.Id(),
-			Name:    name.(string),
+			Name:    d.Get("name").(string),
 		}
 		err := apiClient.Call(params, &resp)
 		if err != nil {
@@ -325,10 +326,10 @@ func resourceUHostUpdate(d *schema.ResourceData, meta interface{}) error {
 	}
 
 	// tag
-	if tag := d.Get("tag"); d.HasChange("tag") || (d.IsNewResource() && tag.(string) != "") {
+	if d.HasChange("tag") && !d.IsNewResource() {
 		params := &client.ModifyUHostInstanceTagRequest{
 			UHostId: d.Id(),
-			Tag:     tag.(string),
+			Tag:     d.Get("tag").(string),
 		}
 		err := apiClient.Call(params, &resp)
 		if err != nil {
@@ -338,10 +339,10 @@ func resourceUHostUpdate(d *schema.ResourceData, meta interface{}) error {
 	}
 
 	// remark
-	if remark := d.Get("remark"); d.HasChange("remark") || (d.IsNewResource() && remark.(string) != "") {
+	if d.HasChange("remark") || (d.IsNewResource() && d.Get("remark").(string) != "") {
 		params := client.ModifyUHostInstanceRemarkRequest{
 			UHostId: d.Id(),
-			Remark:  remark.(string),
+			Remark:  d.Get("remark").(string),
 		}
 		err := apiClient.Call(&params, &resp)
 		if err != nil {
@@ -350,36 +351,9 @@ func resourceUHostUpdate(d *schema.ResourceData, meta interface{}) error {
 		d.SetPartial("remark")
 	}
 
-	// password
-	if d.HasChange("password") {
-		params := client.ResetUHostInstancePasswordRequest{
-			UHostId:  d.Id(),
-			Password: base64.StdEncoding.EncodeToString([]byte(d.Get("password").(string))),
-		}
-		err := apiClient.Call(&params, &resp)
-		if err != nil {
-			return err
-		}
-		d.SetPartial("password")
-	}
-
 	// reize: has to restart the host
-	// 实例状态， 初始化: Initializing; 启动中: Starting; 运行中: Running; 关机中: Stopping; 关机: Stopped 安装失败: Install Fail; 重启中: Rebooting
-	if d.HasChange("cpu") || d.HasChange("memory") || d.HasChange("disk_space") {
-		err := apiClient.Call(&client.StopUHostInstanceRequest{UHostId: d.Id()}, &resp)
-		if err != nil {
-			return err
-		}
-
-		stateConf := &resource.StateChangeConf{
-			Pending:    []string{"Running", "Stopping", "Rebooting"},
-			Target:     []string{"Stopped"},
-			Refresh:    instanceRefreshFunc(apiClient, d.Id()),
-			Timeout:    10 * time.Minute,
-			Delay:      10 * time.Second,
-			MinTimeout: 3 * time.Second,
-		}
-		_, err = stateConf.WaitForState()
+	if !d.IsNewResource() && (d.HasChange("cpu") || d.HasChange("memory") || d.HasChange("disk_space")) {
+		err := startUHostInstance(apiClient, d.Id())
 		if err != nil {
 			return err
 		}
@@ -401,20 +375,7 @@ func resourceUHostUpdate(d *schema.ResourceData, meta interface{}) error {
 			return err
 		}
 
-		err = apiClient.Call(&client.StartUHostInstanceRequest{UHostId: d.Id()}, &resp)
-		if err != nil {
-			return err
-		}
-
-		stateConf = &resource.StateChangeConf{
-			Pending:    []string{"Stopped", "Stopping", "Rebooting"},
-			Target:     []string{"Running"},
-			Refresh:    instanceRefreshFunc(apiClient, d.Id()),
-			Timeout:    10 * time.Minute,
-			Delay:      10 * time.Second,
-			MinTimeout: 3 * time.Second,
-		}
-		_, err = stateConf.WaitForState()
+		err = stopUHostInstance(apiClient, d.Id())
 		if err != nil {
 			return err
 		}
@@ -429,12 +390,26 @@ func resourceUHostUpdate(d *schema.ResourceData, meta interface{}) error {
 
 func resourceUHostDelete(d *schema.ResourceData, meta interface{}) error {
 	apiClient := meta.(*client.Client)
+	host, err := describeInstance(apiClient, d.Id())
+	if err != nil {
+		return err
+	}
+	// not found already gong
+	if host == nil {
+		d.SetId("")
+		return nil
+	}
+
+	if host.State != "Stopped" && host.State != "Install Failed" {
+		err = stopUHostInstance(apiClient, d.Id())
+		if err != nil {
+			return err
+		}
+	}
 
 	var resp client.GeneralResponse
-	params := client.TerminateUHostInstanceRequest{
-		UHostId: d.Id(),
-	}
-	err := apiClient.Call(&params, &resp)
+	params := client.TerminateUHostInstanceRequest{UHostId: d.Id()}
+	err = apiClient.Call(&params, &resp)
 	if err != nil {
 		return err
 	}
@@ -519,4 +494,42 @@ func setResourceDataFromInstance(d *schema.ResourceData, instance *client.UHostI
 	d.Set("disk_set", instance.DiskSet)
 	d.Set("ip_set", instance.IPSet)
 	d.Set("net_capability", instance.NetCapability)
+}
+
+func stopUHostInstance(c *client.Client, id string) error {
+	var resp client.GeneralResponse
+	err := c.Call(&client.StopUHostInstanceRequest{UHostId: id}, &resp)
+	if err != nil {
+		return err
+	}
+
+	stateConf := &resource.StateChangeConf{
+		Pending:    []string{"Running", "Stopping", "Rebooting"},
+		Target:     []string{"Stopped"},
+		Refresh:    instanceRefreshFunc(c, id),
+		Timeout:    10 * time.Minute,
+		Delay:      10 * time.Second,
+		MinTimeout: 3 * time.Second,
+	}
+	_, err = stateConf.WaitForState()
+	return err
+}
+
+func startUHostInstance(c *client.Client, id string) error {
+	var resp client.GeneralResponse
+	err := c.Call(&client.StartUHostInstanceRequest{UHostId: id}, &resp)
+	if err != nil {
+		return err
+	}
+
+	stateConf := &resource.StateChangeConf{
+		Pending:    []string{"Stopped", "Stopping", "Rebooting"},
+		Target:     []string{"Running"},
+		Refresh:    instanceRefreshFunc(c, id),
+		Timeout:    10 * time.Minute,
+		Delay:      10 * time.Second,
+		MinTimeout: 3 * time.Second,
+	}
+	_, err = stateConf.WaitForState()
+	return err
 }

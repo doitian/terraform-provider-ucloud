@@ -17,5 +17,5 @@ type BadRetCodeError struct {
 }
 
 func (brce *BadRetCodeError) Error() string {
-	return fmt.Sprintf("Bad RetCode %d:%s %s", brce.RetCode, brce.Action, brce.Message)
+	return fmt.Sprintf("Bad RetCode %d in %s: %s", brce.RetCode, brce.Action, brce.Message)
 }

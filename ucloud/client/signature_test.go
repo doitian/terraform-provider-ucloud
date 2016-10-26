@@ -29,7 +29,7 @@ import (
 //     "PublicKey"  :  "ucloudsomeone@example.com1296235120854146120"
 // }
 
-func TestGenerateSampleSignature(t *testing.T) {
+func TestSignatureGenerateSampleSignature(t *testing.T) {
 	privateKey := "46f09bb9fab4f12dfc160dae12273d5332b5debe"
 
 	params := url.Values{}

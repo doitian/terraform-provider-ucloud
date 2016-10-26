@@ -13,7 +13,7 @@ import (
 )
 
 // Test InvalidClientFieldError
-func TestConfig(t *testing.T) {
+func TestClientConfig(t *testing.T) {
 	c := Config{}
 	_, err := c.Client()
 	if err == nil || !strings.Contains(err.Error(), "PublicKey") {
@@ -36,7 +36,7 @@ func TestConfig(t *testing.T) {
 	}
 }
 
-func TestSampleSignature(t *testing.T) {
+func TestClientSampleSignature(t *testing.T) {
 	handler := http.NotFound
 	hs := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
 		handler(rw, req)
@@ -84,7 +84,7 @@ func TestSampleSignature(t *testing.T) {
 	}
 }
 
-func TestDescribeUhost(t *testing.T) {
+func TestAccDescribeUHostInstance(t *testing.T) {
 	if os.Getenv(resource.TestEnvVar) == "" {
 		return
 	}

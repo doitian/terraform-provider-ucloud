@@ -10,6 +10,10 @@ import (
 )
 
 func Provider() terraform.ResourceProvider {
+	return ProviderWithConfig(nil)
+}
+
+func ProviderWithConfig(c *client.Config) terraform.ResourceProvider {
 	return &schema.Provider{
 		Schema: map[string]*schema.Schema{
 			"public_key": &schema.Schema{
@@ -54,19 +58,36 @@ func Provider() terraform.ResourceProvider {
 			"ucloud_uhost": resourceUHost(),
 		},
 
-		ConfigureFunc: providerConfigure,
+		ConfigureFunc: providerConfigure(c),
 	}
 }
 
-func providerConfigure(d *schema.ResourceData) (interface{}, error) {
-	config := client.Config{
-		HttpClient: &http.Client{},
-		PublicKey:  d.Get("public_key").(string),
-		PrivateKey: d.Get("private_key").(string),
-		ProjectId:  d.Get("project_id").(string),
-		Region:     d.Get("region").(string),
-		Endpoint:   d.Get("endpoint").(string),
-	}
+func providerConfigure(c *client.Config) func(*schema.ResourceData) (interface{}, error) {
+	return func(d *schema.ResourceData) (interface{}, error) {
+		config := client.Config{}
+		if c != nil {
+			config = *c
+		}
 
-	return config.Client()
+		if config.HttpClient == nil {
+			config.HttpClient = &http.Client{}
+		}
+		if config.PublicKey == "" {
+			config.PublicKey = d.Get("public_key").(string)
+		}
+		if config.PrivateKey == "" {
+			config.PrivateKey = d.Get("private_key").(string)
+		}
+		if config.ProjectId == "" {
+			config.ProjectId = d.Get("project_id").(string)
+		}
+		if config.Region == "" {
+			config.Region = d.Get("region").(string)
+		}
+		if config.Endpoint == "" {
+			config.Endpoint = d.Get("endpoint").(string)
+		}
+
+		return config.Client()
+	}
 }

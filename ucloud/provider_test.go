@@ -1,18 +1,25 @@
 package ucloud
 
 import (
+	"log"
 	"os"
 	"testing"
 
 	"github.com/hashicorp/terraform/helper/schema"
 	"github.com/hashicorp/terraform/terraform"
+
+	"github.com/3pjgames/terraform-provider-ucloud/ucloud/client"
 )
 
 var testAccProviders map[string]terraform.ResourceProvider
 var testAccProvider *schema.Provider
 
 func init() {
-	testAccProvider = Provider().(*schema.Provider)
+	if os.Getenv("UCLOUD_DEBUG") != "" {
+		testAccProvider = ProviderWithConfig(&client.Config{Logger: log.New(os.Stdout, "UCloud API: ", log.LstdFlags)}).(*schema.Provider)
+	} else {
+		testAccProvider = Provider().(*schema.Provider)
+	}
 	testAccProviders = map[string]terraform.ResourceProvider{
 		"ucloud": testAccProvider,
 	}
