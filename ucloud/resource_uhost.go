@@ -353,7 +353,7 @@ func resourceUHostUpdate(d *schema.ResourceData, meta interface{}) error {
 
 	// reize: has to restart the host
 	if !d.IsNewResource() && (d.HasChange("cpu") || d.HasChange("memory") || d.HasChange("disk_space")) {
-		err := startUHostInstance(apiClient, d.Id())
+		err := stopUHostInstance(apiClient, d.Id())
 		if err != nil {
 			return err
 		}
@@ -375,7 +375,7 @@ func resourceUHostUpdate(d *schema.ResourceData, meta interface{}) error {
 			return err
 		}
 
-		err = stopUHostInstance(apiClient, d.Id())
+		err = startUHostInstance(apiClient, d.Id())
 		if err != nil {
 			return err
 		}

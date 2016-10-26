@@ -26,6 +26,36 @@ func TestAccResourceUHost(t *testing.T) {
 				Check: resource.ComposeTestCheckFunc(
 					testAccCheckUHostExists("ucloud_uhost.foo", &host),
 					resource.TestCheckResourceAttr("ucloud_uhost.foo", "name", "foo"),
+					resource.TestCheckResourceAttr("ucloud_uhost.foo", "remark", "bar"),
+					resource.TestCheckResourceAttr("ucloud_uhost.foo", "tag", "test"),
+					resource.TestCheckResourceAttr("ucloud_uhost.foo", "cpu", "1"),
+					resource.TestCheckResourceAttr("ucloud_uhost.foo", "memory", "1024"),
+					resource.TestCheckResourceAttr("ucloud_uhost.foo", "disk_space", "10"),
+				),
+			},
+			resource.TestStep{
+				Config: fmt.Sprintf(testAccUHostConfig, os.Getenv("UCLOUD_ZONE")),
+				Check: resource.ComposeTestCheckFunc(
+					testAccCheckUHostExists("ucloud_uhost.foo", &host),
+					resource.TestCheckResourceAttr("ucloud_uhost.foo", "name", "foox"),
+					resource.TestCheckResourceAttr("ucloud_uhost.foo", "remark", "barx"),
+					resource.TestCheckResourceAttr("ucloud_uhost.foo", "tag", "testx"),
+					resource.TestCheckResourceAttr("ucloud_uhost.foo", "cpu", "2"),
+					resource.TestCheckResourceAttr("ucloud_uhost.foo", "memory", "2048"),
+					resource.TestCheckResourceAttr("ucloud_uhost.foo", "disk_space", "0"),
+				),
+			},
+			// Repeat the config
+			resource.TestStep{
+				Config: fmt.Sprintf(testAccUHostConfig, os.Getenv("UCLOUD_ZONE")),
+				Check: resource.ComposeTestCheckFunc(
+					testAccCheckUHostExists("ucloud_uhost.foo", &host),
+					resource.TestCheckResourceAttr("ucloud_uhost.foo", "name", "foox"),
+					resource.TestCheckResourceAttr("ucloud_uhost.foo", "remark", "barx"),
+					resource.TestCheckResourceAttr("ucloud_uhost.foo", "tag", "testx"),
+					resource.TestCheckResourceAttr("ucloud_uhost.foo", "cpu", "2"),
+					resource.TestCheckResourceAttr("ucloud_uhost.foo", "memory", "2048"),
+					resource.TestCheckResourceAttr("ucloud_uhost.foo", "disk_space", "0"),
 				),
 			},
 		},
@@ -56,7 +86,7 @@ resource "ucloud_uhost" "foo" {
 	cpu = 2
 	memory = 2048
 	disk_space = 0
-	password = "dGVycmFmb3JtLWZvbw=="
+	password = "dGVycmFmb3JtLXByb3ZpZGVyLXVjbG91ZA=="
 	image_id = "uimage-j4fbrn"
 	charge_type = "Dynamic"
 }
