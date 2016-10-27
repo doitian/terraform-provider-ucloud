@@ -8,6 +8,10 @@ import (
 	"strings"
 )
 
+type Parameterizable interface {
+	Parameterize() (string, error)
+}
+
 func safeIsNil(val reflect.Value) bool {
 	switch val.Kind() {
 	case reflect.Ptr, reflect.Array, reflect.Slice, reflect.Map, reflect.Chan:
@@ -17,8 +21,11 @@ func safeIsNil(val reflect.Value) bool {
 	}
 }
 
-func stringify(v reflect.Value) (str string, ok bool) {
+func parameterize(v reflect.Value) (str string, ok bool) {
 	ok = false
+	if v.Kind() == reflect.Ptr {
+		v = v.Elem()
+	}
 
 	switch v.Kind() {
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
@@ -36,6 +43,15 @@ func stringify(v reflect.Value) (str string, ok bool) {
 	case reflect.String:
 		ok = true
 		str = v.String()
+
+	default:
+		if p, assertOk := v.Interface().(Parameterizable); assertOk {
+			parameterized, err := p.Parameterize()
+			if err == nil {
+				ok = true
+				str = parameterized
+			}
+		}
 	}
 
 	return
@@ -76,14 +92,14 @@ func AddParams(params url.Values, req interface{}) error {
 			fieldName = typeField.Name
 		}
 
-		if fieldValue, ok := stringify(field); ok {
+		if fieldValue, ok := parameterize(field); ok {
 			if fieldValue != "" {
 				params.Set(fieldName, fieldValue)
 			}
 		} else if fieldKind == reflect.Slice {
 			for j := 0; j < field.Len(); j++ {
 				elem := field.Index(j)
-				if elemValue, ok := stringify(elem); ok {
+				if elemValue, ok := parameterize(elem); ok {
 					params.Set(fieldName+"."+strconv.Itoa(j), elemValue)
 				} else {
 					return fmt.Errorf("Cannot convert %s to params in slice", elem.Kind())

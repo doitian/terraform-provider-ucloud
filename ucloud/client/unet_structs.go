@@ -1,5 +1,9 @@
 package client
 
+import (
+	"fmt"
+)
+
 type EIPResource struct {
 	ResourceID   string
 	ResourceType string
@@ -126,6 +130,10 @@ type SecurityGroupRule struct {
 	Priority     int
 }
 
+func (rule SecurityGroupRule) Parameterize() (string, error) {
+	return fmt.Sprintf("%s|%s|%s|%s|%d", rule.ProtocolType, rule.DstPort, rule.SrcIP, rule.RuleAction, rule.Priority), nil
+}
+
 type SecurityGroup struct {
 	GroupId     int
 	GroupName   string
@@ -142,7 +150,7 @@ type SecurityGroup struct {
 type CreateSecurityGroupRequest struct {
 	GroupName   string
 	Description string
-	Rule        []string
+	Rule        []SecurityGroupRule
 }
 type CreateSecurityGroupResponse struct {
 	GeneralResponse
@@ -168,7 +176,7 @@ type DescribeSecurityGroupResourceResponse struct {
 
 type UpdateSecurityGroupRequest struct {
 	GroupId int
-	Rule    []string
+	Rule    []SecurityGroupRule
 }
 type UpdateSecurityGroupResponse struct {
 	GeneralResponse
