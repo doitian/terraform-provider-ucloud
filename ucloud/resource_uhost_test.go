@@ -107,7 +107,7 @@ func testAccCheckUHostDestroyWithProvider(s *terraform.State, provider *schema.P
 		err := apiClient.Call(&client.DescribeUHostInstanceRequest{UHostIds: []string{rs.Primary.ID}}, &describeInstancesResp)
 		if err == nil {
 			for _, i := range describeInstancesResp.UHostSet {
-				return fmt.Errorf("Found unterminated instance: %s", i)
+				return fmt.Errorf("Found unterminated instance: %+v", i)
 			}
 		}
 
