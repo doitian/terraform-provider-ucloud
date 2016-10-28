@@ -131,7 +131,7 @@ func resourceUHost() *schema.Resource {
 			},
 
 			"disk_set": {
-				Type:     schema.TypeSet,
+				Type:     schema.TypeList,
 				Computed: true,
 				Elem: &schema.Resource{
 					Schema: map[string]*schema.Schema{
@@ -143,12 +143,8 @@ func resourceUHost() *schema.Resource {
 							Type:     schema.TypeString,
 							Computed: true,
 						},
-						"name": {
-							Type:     schema.TypeInt,
-							Computed: true,
-						},
 						"drive": {
-							Type:     schema.TypeInt,
+							Type:     schema.TypeString,
 							Computed: true,
 						},
 						"size": {
@@ -157,14 +153,10 @@ func resourceUHost() *schema.Resource {
 						},
 					},
 				},
-				Set: func(v interface{}) int {
-					m := v.(map[string]interface{})
-					return schema.HashString(m["disk_id"].(string))
-				},
 			},
 
 			"ip_set": {
-				Type:     schema.TypeSet,
+				Type:     schema.TypeList,
 				Computed: true,
 				Elem: &schema.Resource{
 					Schema: map[string]*schema.Schema{
@@ -177,7 +169,7 @@ func resourceUHost() *schema.Resource {
 							Computed: true,
 						},
 						"ip": {
-							Type:     schema.TypeInt,
+							Type:     schema.TypeString,
 							Computed: true,
 						},
 						"bandwidth": {
@@ -185,10 +177,6 @@ func resourceUHost() *schema.Resource {
 							Computed: true,
 						},
 					},
-				},
-				Set: func(v interface{}) int {
-					m := v.(map[string]interface{})
-					return schema.HashString(m["ip"].(string))
 				},
 			},
 		},
@@ -480,6 +468,36 @@ func findInstanceIP(instance *client.UHostInstance) string {
 	return ""
 }
 
+func readDiskSet(instance *client.UHostInstance) []map[string]interface{} {
+	diskSet := make([]map[string]interface{}, 0, len(instance.DiskSet))
+
+	for _, disk := range instance.DiskSet {
+		diskSet = append(diskSet, map[string]interface{}{
+			"type":    disk.Type,
+			"disk_id": disk.DiskId,
+			"drive":   disk.Drive,
+			"size":    disk.Size,
+		})
+	}
+
+	return diskSet
+}
+
+func readIPSet(instance *client.UHostInstance) interface{} {
+	ipSet := make([]map[string]interface{}, 0, len(instance.IPSet))
+
+	for _, ip := range instance.IPSet {
+		ipSet = append(ipSet, map[string]interface{}{
+			"type":      ip.Type,
+			"ip_id":     ip.IPId,
+			"ip":        ip.IP,
+			"bandwidth": ip.Bandwidth,
+		})
+	}
+
+	return ipSet
+}
+
 func setResourceDataFromInstance(d *schema.ResourceData, instance *client.UHostInstance) {
 	d.Set("uhost_type", instance.UHostType)
 	d.Set("storage_type", instance.StorageType)
@@ -491,8 +509,8 @@ func setResourceDataFromInstance(d *schema.ResourceData, instance *client.UHostI
 	d.Set("charge_type", instance.ChargeType)
 	d.Set("cpu", instance.CPU)
 	d.Set("memory", instance.Memory)
-	d.Set("disk_set", instance.DiskSet)
-	d.Set("ip_set", instance.IPSet)
+	d.Set("disk_set", readDiskSet(instance))
+	d.Set("ip_set", readIPSet(instance))
 	d.Set("net_capability", instance.NetCapability)
 }
 
@@ -517,7 +535,17 @@ func stopUHostInstance(c *client.Client, id string) error {
 
 func startUHostInstance(c *client.Client, id string) error {
 	var resp client.GeneralResponse
-	err := c.Call(&client.StartUHostInstanceRequest{UHostId: id}, &resp)
+	err := resource.Retry(60*time.Second, func() *resource.RetryError {
+		err := c.Call(&client.StartUHostInstanceRequest{UHostId: id}, &resp)
+		if err != nil {
+			if brce, ok := err.(*client.BadRetCodeError); ok && brce.RetCode == 8903 { // uhost in task error
+				return resource.RetryableError(brce)
+			}
+			return resource.NonRetryableError(err)
+		}
+		return nil
+	})
+
 	if err != nil {
 		return err
 	}

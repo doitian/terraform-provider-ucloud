@@ -31,6 +31,10 @@ func TestAccResourceUHost(t *testing.T) {
 					resource.TestCheckResourceAttr("ucloud_uhost.foo", "cpu", "1"),
 					resource.TestCheckResourceAttr("ucloud_uhost.foo", "memory", "1024"),
 					resource.TestCheckResourceAttr("ucloud_uhost.foo", "disk_space", "10"),
+					resource.TestCheckResourceAttr("ucloud_uhost.foo", "disk_set.#", "2"),
+					testDataDeviceSize("ucloud_uhost.foo", "10"),
+					resource.TestCheckResourceAttr("ucloud_uhost.foo", "ip_set.#", "1"),
+					resource.TestCheckResourceAttr("ucloud_uhost.foo", "ip_set.0.type", "Private"),
 				),
 			},
 			resource.TestStep{
@@ -42,7 +46,11 @@ func TestAccResourceUHost(t *testing.T) {
 					resource.TestCheckResourceAttr("ucloud_uhost.foo", "tag", "testx"),
 					resource.TestCheckResourceAttr("ucloud_uhost.foo", "cpu", "2"),
 					resource.TestCheckResourceAttr("ucloud_uhost.foo", "memory", "2048"),
-					resource.TestCheckResourceAttr("ucloud_uhost.foo", "disk_space", "0"),
+					resource.TestCheckResourceAttr("ucloud_uhost.foo", "disk_space", "20"),
+					resource.TestCheckResourceAttr("ucloud_uhost.foo", "disk_set.#", "2"),
+					testDataDeviceSize("ucloud_uhost.foo", "20"),
+					resource.TestCheckResourceAttr("ucloud_uhost.foo", "ip_set.#", "1"),
+					resource.TestCheckResourceAttr("ucloud_uhost.foo", "ip_set.0.type", "Private"),
 				),
 			},
 			// Repeat the config
@@ -55,7 +63,11 @@ func TestAccResourceUHost(t *testing.T) {
 					resource.TestCheckResourceAttr("ucloud_uhost.foo", "tag", "testx"),
 					resource.TestCheckResourceAttr("ucloud_uhost.foo", "cpu", "2"),
 					resource.TestCheckResourceAttr("ucloud_uhost.foo", "memory", "2048"),
-					resource.TestCheckResourceAttr("ucloud_uhost.foo", "disk_space", "0"),
+					resource.TestCheckResourceAttr("ucloud_uhost.foo", "disk_space", "20"),
+					resource.TestCheckResourceAttr("ucloud_uhost.foo", "disk_set.#", "2"),
+					testDataDeviceSize("ucloud_uhost.foo", "20"),
+					resource.TestCheckResourceAttr("ucloud_uhost.foo", "ip_set.#", "1"),
+					resource.TestCheckResourceAttr("ucloud_uhost.foo", "ip_set.0.type", "Private"),
 				),
 			},
 		},
@@ -85,7 +97,7 @@ resource "ucloud_uhost" "foo" {
 	tag = "testx"
 	cpu = 2
 	memory = 2048
-	disk_space = 0
+	disk_space = 20
 	password = "dGVycmFmb3JtLXByb3ZpZGVyLXVjbG91ZA=="
 	image_id = "uimage-j4fbrn"
 	charge_type = "Dynamic"
@@ -154,5 +166,22 @@ func testAccCheckUHostExistsWithProviders(n string, i *client.UHostInstance, pro
 		}
 
 		return fmt.Errorf("Instance not found")
+	}
+}
+
+func testDataDeviceSize(n string, expectSize string) resource.TestCheckFunc {
+	return func(s *terraform.State) error {
+		rs, ok := s.RootModule().Resources[n]
+		if !ok {
+			return fmt.Errorf("Not found: %s", n)
+		}
+
+		for i := 0; i < 2; i++ {
+			if rs.Primary.Attributes[fmt.Sprintf("disk_set.%d.type", i)] == "Data" && rs.Primary.Attributes[fmt.Sprintf("disk_set.%d.size", i)] == expectSize {
+				return nil
+			}
+		}
+
+		return fmt.Errorf("Not found data disk with size %s", expectSize)
 	}
 }
