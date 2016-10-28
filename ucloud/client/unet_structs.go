@@ -165,6 +165,10 @@ type DescribeSecurityGroupResponse struct {
 	GeneralResponse
 	DataSet []SecurityGroup
 }
+type DescribeOneSecurityGroupResponse struct {
+	GeneralResponse
+	DataSet *SecurityGroup
+}
 
 type DescribeSecurityGroupResourceRequest struct {
 	GroupId int

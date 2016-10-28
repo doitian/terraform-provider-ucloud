@@ -55,7 +55,8 @@ func ProviderWithConfig(c *client.Config) terraform.ResourceProvider {
 		},
 
 		ResourcesMap: map[string]*schema.Resource{
-			"ucloud_uhost": resourceUHost(),
+			"ucloud_uhost":          resourceUHost(),
+			"ucloud_security_group": resourceSecurityGroup(),
 		},
 
 		ConfigureFunc: providerConfigure(c),
