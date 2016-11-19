@@ -33,7 +33,7 @@ func ProviderWithConfig(c *client.Config) terraform.ResourceProvider {
 			"project_id": &schema.Schema{
 				Type:        schema.TypeString,
 				Optional:    true,
-				DefaultFunc: schema.EnvDefaultFunc("UCLOUD_PROJECT_ID", nil),
+				DefaultFunc: schema.EnvDefaultFunc("UCLOUD_PROJECT_ID", ""),
 				Description: "UCloud Project ID, leave empty for default project. See https://docs.ucloud.cn/api/summary/get_project_list",
 			},
 			"region": &schema.Schema{
@@ -45,7 +45,7 @@ func ProviderWithConfig(c *client.Config) terraform.ResourceProvider {
 			"endpoint": &schema.Schema{
 				Type:        schema.TypeString,
 				Optional:    true,
-				DefaultFunc: schema.EnvDefaultFunc("UCLOUD_ENDPOINT", nil),
+				DefaultFunc: schema.EnvDefaultFunc("UCLOUD_ENDPOINT", ""),
 				Description: "UCloud API Endpoint",
 			},
 		},
