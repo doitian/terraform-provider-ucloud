@@ -31,3 +31,5 @@ vendor/
 
 # my gitignore
 .env
+
+/terraform-provider-ucloud
